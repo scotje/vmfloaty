@@ -89,6 +89,7 @@ class Vmfloaty
       c.option '--active', 'Prints information about active vms for a given token'
       c.option '--token STRING', String, 'Token for pooler service'
       c.option '--url STRING', String, 'URL of pooler service'
+      c.option '--hostnameonly', 'When listing active vms, print only the hostname of the vm, one per line'
       c.action do |args, options|
         verbose = options.verbose || config['verbose']
 
@@ -98,12 +99,13 @@ class Vmfloaty
         if options.active
           # list active vms
           running_vms = service.list_active(verbose)
+
           host = URI.parse(service.url).host
           if running_vms.empty?
-            puts "You have no running VMs on #{host}"
+            puts "You have no running VMs on #{host}" unless options.hostnameonly
           else
-            puts "Your VMs on #{host}:"
-            Utils.pretty_print_hosts(verbose, service, running_vms)
+            puts "Your VMs on #{host}:" unless options.hostnameonly
+            Utils.pretty_print_hosts(verbose, service, running_vms, hostname_only: options.hostnameonly)
           end
         else
           # list available vms from pooler
@@ -217,7 +219,7 @@ class Vmfloaty
           if running_vms.empty?
             puts 'You have no running VMs.'
           else
-            Utils.pretty_print_hosts(verbose, service, running_vms, true)
+            Utils.pretty_print_hosts(verbose, service, running_vms, print_to_stderr: true)
             # Confirm deletion
             confirmed = true
             confirmed = agree('Delete all these VMs? [y/N]') unless force

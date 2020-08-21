@@ -78,7 +78,13 @@ class Utils
     os_types
   end
 
-  def self.pretty_print_hosts(verbose, service, hostnames = [], print_to_stderr = false)
+  def self.pretty_print_hosts(verbose, service, hostnames = [], options = {})
+    options ||= {}
+    options[:print_to_stderr] = false unless options.key?(:print_to_stderr)
+    options[:hostname_only] = false unless options.key?(:hostname_only)
+
+    target = options[:print_to_stderr] ? $stderr : $stdout
+
     hostnames = [hostnames] unless hostnames.is_a? Array
     hostnames.each do |hostname|
       begin
@@ -90,21 +96,35 @@ class Utils
           # For ABS, 'hostname' variable is the jobID
           if host_data['state'] == 'allocated' || host_data['state'] == 'filled'
             host_data['allocated_resources'].each do |vm_name, _i|
-              puts "- [JobID:#{host_data['request']['job']['id']}] #{vm_name['hostname']} (#{vm_name['type']}) <#{host_data['state']}>"
+              if options[:hostname_only]
+                target.puts vm_name['hostname']
+              else
+                target.puts "- [JobID:#{host_data['request']['job']['id']}] #{vm_name['hostname']} (#{vm_name['type']}) <#{host_data['state']}>"
+              end
             end
           end
         when 'Pooler'
+          if options[:hostname_only]
+            target.puts "#{hostname}.#{host_data['domain']}"
+            next
+          end
+
           tag_pairs = []
           tag_pairs = host_data['tags'].map { |key, value| "#{key}: #{value}" } unless host_data['tags'].nil?
           duration = "#{host_data['running']}/#{host_data['lifetime']} hours"
           metadata = [host_data['template'], duration, *tag_pairs]
-          puts "- #{hostname}.#{host_data['domain']} (#{metadata.join(', ')})"
+          target.puts "- #{hostname}.#{host_data['domain']} (#{metadata.join(', ')})"
         when 'NonstandardPooler'
+          if options[:hostname_only]
+            target.puts host_data['fqdn']
+            next
+          end
+
           line = "- #{host_data['fqdn']} (#{host_data['os_triple']}"
           line += ", #{host_data['hours_left_on_reservation']}h remaining"
           line += ", reason: #{host_data['reserved_for_reason']}" unless host_data['reserved_for_reason'].empty?
           line += ')'
-          puts line
+          target.puts line
         else
           raise "Invalid service type #{service.type}"
         end
